@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Безопасный секретный ключ (замените на случайный или используйте переменную окружения)
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-1234567890abcdef')  # Для безопасности лучше взять из переменной окружения
 DEBUG = False  # Отключаем для продакшена
-ALLOWED_HOSTS = ['*']  # Замените на конкретный домен Render после деплоя, например, 'your-backend.onrender.com'
+ALLOWED_HOSTS = ['service-lessons.onrender.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
