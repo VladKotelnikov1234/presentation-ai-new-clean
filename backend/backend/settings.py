@@ -33,7 +33,7 @@ MIDDLEWARE = [
 
 # CORS настройки для фронтенда на Render
 CORS_ALLOWED_ORIGINS = [
-    "https://your-frontend.onrender.com",  # Замените на URL вашего фронтенда после деплоя
+    "https://lessons-brmd.onrender.com",  # Замените на URL вашего фронтенда после деплоя
 ]
 CORS_ALLOW_METHODS = [
     "GET",

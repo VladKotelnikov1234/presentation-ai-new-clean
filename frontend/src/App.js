@@ -8,9 +8,13 @@ const App = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [archiveUrl, setArchiveUrl] = useState(null); // Для хранения URL архива
+  const [archiveUrl, setArchiveUrl] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null); // Для отображения ошибок
   const pdfInputRef = useRef(null);
   const videoInputRef = useRef(null);
+
+  // Базовый URL бэкенда (замени на актуальный)
+  const API_BASE_URL = 'https://service-lessons.onrender.com';
 
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
@@ -19,6 +23,7 @@ const App = () => {
     } else {
       setVideoFile(file);
     }
+    setErrorMessage(null); // Сбрасываем ошибку при выборе нового файла
   };
 
   const handleDrop = (e, type) => {
@@ -28,6 +33,8 @@ const App = () => {
       setPdfFile(file);
     } else if (type === 'video' && file.type.startsWith('video/')) {
       setVideoFile(file);
+    } else {
+      setErrorMessage(`Неверный формат файла для ${type === 'pdf' ? 'PDF' : 'видео/аудио'}`);
     }
   };
 
@@ -38,39 +45,46 @@ const App = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!pdfFile) {
-      alert('Пожалуйста, выберите PDF файл');
+      setErrorMessage('Пожалуйста, выберите PDF файл');
       return;
     }
 
     setUploading(true);
     setProgress(0);
-    setArchiveUrl(null); // Сбрасываем URL архива перед новым запросом
+    setArchiveUrl(null);
+    setErrorMessage(null);
 
     const formData = new FormData();
-    formData.append('pdf_file', pdfFile);
+    formData.append('file', pdfFile); // Убедимся, что имя поля совпадает с ожиданием бэкенда
     if (videoFile) {
       formData.append('video_file', videoFile);
     }
 
     try {
-      const uploadResponse = await axios.post('http://localhost:8000/api/upload/', formData, {
+      // Отправляем файл на бэкенд
+      const uploadResponse = await axios.post(`${API_BASE_URL}/api/upload/`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
         onUploadProgress: (progressEvent) => {
           const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setProgress(percent);
         },
       });
 
-      // Предполагаем, что после загрузки сразу вызываем генерацию уроков
-      const generateResponse = await axios.post('http://localhost:8000/api/generate', {
-        material_path: uploadResponse.data.material_path,
-        audio_path: uploadResponse.data.audio_path,
-      });
+      // Предполагаем, что бэкенд возвращает archive_url напрямую после обработки
+      if (uploadResponse.data.archive_url) {
+        setArchiveUrl(`${API_BASE_URL}${uploadResponse.data.archive_url}`);
+      } else {
+        setErrorMessage('Архив не был сгенерирован. Проверьте бэкенд.');
+      }
 
-      setArchiveUrl(`http://localhost:8000${generateResponse.data.archive_url}`);
       setUploading(false);
       setProgress(0);
     } catch (error) {
-      alert('Ошибка при обработке: ' + (error.response?.data?.error || error.message));
+      setErrorMessage(
+        'Ошибка при обработке: ' + (error.response?.data?.error || error.message)
+      );
       setUploading(false);
       setProgress(0);
     }
@@ -104,10 +118,12 @@ const App = () => {
           onClick={() => videoInputRef.current.click()}
         >
           <i className="fas fa-video"></i>
-          <p>{videoFile ? videoFile.name : 'Перетащите видео/аудио или кликните для выбора (опционально)'}</p>
+          <p>
+            {videoFile ? videoFile.name : 'Перетащите видео/аудио или кликните для выбора (опционально)'}
+          </p>
           <input
             type="file"
-            accept="video/*,audio/*" // Добавляем поддержку аудио (MP3)
+            accept="video/*,audio/*"
             ref={videoInputRef}
             style={{ display: 'none' }}
             onChange={(e) => handleFileChange(e, 'video')}
@@ -120,19 +136,23 @@ const App = () => {
 
         {uploading && (
           <div className="progress-bar">
-            <div style={{ width: `${progress}%` }}></div>
+            <div style={{ width: `${progress}%` }}>{progress}%</div>
           </div>
         )}
       </form>
+
+      {errorMessage && (
+        <div className="error-message" style={{ color: 'red', marginTop: '10px' }}>
+          {errorMessage}
+        </div>
+      )}
 
       {archiveUrl && (
         <div>
           <h2>Видеоуроки готовы!</h2>
           <p>Скачайте архив с вашими видеоуроками:</p>
           <a href={archiveUrl} download>
-            <button style={{ marginTop: '20px' }}>
-              Скачать архив
-            </button>
+            <button style={{ marginTop: '20px' }}>Скачать архив</button>
           </a>
         </div>
       )}
