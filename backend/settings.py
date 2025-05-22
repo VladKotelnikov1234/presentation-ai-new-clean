@@ -59,7 +59,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://service-lessons.onrender.com",  # Добавлен
 ]
 
-ROOT_URLCONF = 'urls'
+ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [
     {
