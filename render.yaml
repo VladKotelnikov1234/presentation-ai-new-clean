@@ -5,8 +5,8 @@ services:
     runtimeVersion: "3.10"
     plan: starter
     region: oregon
-    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt && pip show django-cors-headers && python manage.py migrate"
-    startCommand: "gunicorn backend.wsgi:application --bind 0.0.0.0:8000"
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt && pip show django-cors-headers && source .venv/bin/activate && python manage.py migrate"
+    startCommand: "gunicorn wsgi:application --bind 0.0.0.0:8000"
     envVars:
       - key: PYTHON_VERSION
         value: "3.10"
