@@ -5,8 +5,8 @@ services:
     runtimeVersion: "3.10"
     plan: starter
     region: oregon
-    buildCommand: "/opt/render/project/.venv/bin/python3.10 -m pip install --upgrade pip && /opt/render/project/.venv/bin/python3.10 -m pip install -r requirements.txt && /opt/render/project/.venv/bin/python3.10 -m pip show django-cors-headers && /opt/render/project/.venv/bin/python3.10 manage.py migrate"
-    startCommand: "/opt/render/project/.venv/bin/python3.10 -m gunicorn backend.wsgi:application --bind 0.0.0.0:8000"
+    buildCommand: "/usr/bin/python3.10 -m pip install --upgrade pip && /usr/bin/python3.10 -m pip install -r requirements.txt && /usr/bin/python3.10 -m pip show django-cors-headers && /usr/bin/python3.10 manage.py migrate"
+    startCommand: "/usr/bin/python3.10 -m gunicorn backend.wsgi:application --bind 0.0.0.0:8000"
     envVars:
       - key: PYTHON_VERSION
         value: "3.10"
