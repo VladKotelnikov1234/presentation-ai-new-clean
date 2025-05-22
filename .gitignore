@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.env
+*.sqlite3
+media/
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+.idea/
+echo ".venv/" > .gitignore
+echo "backend/venv/" >> .gitignore
+echo "backend/media/videos/" >> .gitignore
+echo "backend/media/logs/" >> .gitignore
+echo "*.log" >> .gitignore
+echo "*.mp4" >> .gitignore
+echo "*.exe" >> .gitignore
