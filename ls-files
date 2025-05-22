@@ -1,0 +1,15 @@
+[33mcommit c36c8d40755ccfba965a84798fa159647f48ff93[m
+Author: VladKotelnikov1234 <kotelnikov322@gmail.com>
+Date:   Thu May 22 19:47:33 2025 +0500
+
+    Добавлены большие файлы через LFS
+
+D	backend/media/logs/debug.log
+
+[33mcommit 70d6b04eba78c91b87a7b73a5a8d36fa231455a8[m
+Author: VladKotelnikov1234 <kotelnikov322@gmail.com>
+Date:   Thu May 22 19:35:17 2025 +0500
+
+    Initial commit with presentation-ai-new project, excluding venv
+
+A	backend/media/logs/debug.log

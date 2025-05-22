@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: presentation-ai-backend
+    env: python
+    plan: free # или другой план, который вы выберете
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app" # замените на вашу команду запуска, например, "python app.py"
+    region: oregon # выберите регион, например, Oregon
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9 # версия Python, которую вы используете
