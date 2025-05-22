@@ -77,6 +77,7 @@ def process_methodology_text(raw_text, test_mode=True):
         return None
 
     logger.info(f"Используется OPENROUTER_API_KEY: {OPENROUTER_API_KEY[:5]}...")
+    logger.info(f"Длина raw_text: {len(raw_text)} символов")
 
     prompt = (
         "Ты — преподаватель, создающий видеоуроки для любого предмета (физика, химия, программирование и т.д.). "
@@ -99,13 +100,15 @@ def process_methodology_text(raw_text, test_mode=True):
         "X-Title": "VideoLessonService"
     }
     data = {
-        "model": "deepseek/deepseek-r1",  # Заменили модель
+        "model": "openai/gpt-4o-2024-11-20",  # Новая модель
         "messages": [{"role": "user", "content": prompt}]
     }
 
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=30)
+        logger.info(f"Отправка запроса к OpenRouter с prompt длиной: {len(prompt)} символов")
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=60)
         response.raise_for_status()
+        logger.info("Запрос успешно выполнен")
         content = response.json()["choices"][0]["message"]["content"]
         lessons = []
         current_lesson = ""
@@ -118,9 +121,14 @@ def process_methodology_text(raw_text, test_mode=True):
                 current_lesson += line + "\n"
         if current_lesson:
             lessons.append(current_lesson.strip())
+        if not lessons:
+            logger.warning("Ответ от OpenRouter пуст или не содержит уроков")
         return lessons[:lesson_count]
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Ошибка вызова OpenRouter API: {e}, статус код: {getattr(e.response, 'status_code', 'N/A')}, текст: {getattr(e.response, 'text', 'N/A')}")
+        return None
     except Exception as e:
-        logger.error(f"Ошибка вызова OpenRouter API: {e}")
+        logger.error(f"Неизвестная ошибка в process_methodology_text: {e}")
         return None
 
 # Клонирование голоса и генерация аудио через ElevenLabs

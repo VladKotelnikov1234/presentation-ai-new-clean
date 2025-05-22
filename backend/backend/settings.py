@@ -105,6 +105,6 @@ REST_FRAMEWORK = {
 # API-ключи
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY', 'sk_1a928b668fcdd7667d58bbdfeae0e0b77347f6e863c9775f')
 SYNTHESIA_API_KEY = os.getenv('SYNTHESIA_API_KEY', '399b87cac1835dd1e65602af9fe8a2b3')
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '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')  # Новый рабочий ключ
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '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')  # Новый ключ
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
