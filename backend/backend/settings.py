@@ -8,6 +8,7 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = [
     'service-lessons.onrender.com',
+    'lessons-brmd.onrender.com',  # Добавлен второй домен
     'localhost',
     '127.0.0.1',
 ]
@@ -19,13 +20,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'corsheaders',
+    'django_cors_headers',  # Исправлено на правильное название
     'rest_framework',
     'video_processor.apps.VideoProcessorConfig',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'django_cors_headers.middleware.CorsMiddleware',  # Исправлено на правильное название
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -37,6 +38,7 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     "https://lessons-brmd.onrender.com",
+    "https://service-lessons.onrender.com",  # Добавлен для полного покрытия
 ]
 CORS_ALLOW_METHODS = [
     "GET",
@@ -54,6 +56,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "https://lessons-brmd.onrender.com",
+    "https://service-lessons.onrender.com",  # Добавлен
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -102,9 +105,13 @@ REST_FRAMEWORK = {
     ],
 }
 
-# API-ключи
-ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY', 'sk_1a928b668fcdd7667d58bbdfeae0e0b77347f6e863c9775f')
-SYNTHESIA_API_KEY = os.getenv('SYNTHESIA_API_KEY', '399b87cac1835dd1e65602af9fe8a2b3')
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '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')
+# API-ключи (только из окружения, без значений по умолчанию)
+ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
+SYNTHESIA_API_KEY = os.getenv('SYNTHESIA_API_KEY')
+IOINTELLIGENCE_API_KEY = os.getenv('IOINTELLIGENCE_API_KEY')
+
+if not ELEVENLABS_API_KEY or not SYNTHESIA_API_KEY or not IOINTELLIGENCE_API_KEY:
+    logger.error("Одна или несколько API-ключи не заданы")
+    raise ValueError("Отсутствуют необходимые API-ключи")
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
