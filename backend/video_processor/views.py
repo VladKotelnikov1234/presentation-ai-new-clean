@@ -18,6 +18,8 @@ OPENROUTER_API_KEY = settings.OPENROUTER_API_KEY
 ELEVENLABS_API_KEY = settings.ELEVENLABS_API_KEY
 SYNTHESIA_API_KEY = settings.SYNTHESIA_API_KEY
 
+logger.info(f"Получен OPENROUTER_API_KEY: {OPENROUTER_API_KEY}")  # Отладка
+
 def extract_content_from_pdf(pdf_path, max_pages=3):
     """Извлекает текст из первых max_pages страниц PDF, ограничивая 2000 символов."""
     text_content = []
@@ -31,12 +33,12 @@ def extract_content_from_pdf(pdf_path, max_pages=3):
             if not any(keyword in text.lower() for keyword in exclude_keywords):
                 text_content.append(f"Страница {i+1}:\n{text}")
     
-    return "\n".join(text_content)[:2000]  # Ограничиваем 2000 символов
+    return "\n".join(text_content)[:2000]
 
 def process_methodology_text(raw_text, test_mode=True):
     """Обрабатывает текст и создаёт один короткий урок."""
     target_words = 75 if test_mode else 250
-    lesson_count = 1  # Один урок для короткого видео
+    lesson_count = 1
 
     if not OPENROUTER_API_KEY:
         logger.error("OPENROUTER_API_KEY не задан")
@@ -101,7 +103,7 @@ def extract_audio_from_video(video_path):
     """Извлекает аудио из видео и ограничивает длительность."""
     output_path = video_path.replace('.mp4', '.mp3').replace('.avi', '.mp3')
     video = VideoFileClip(video_path)
-    if video.duration > 30:  # Ограничиваем 30 секунд
+    if video.duration > 30:
         video = video.subclip(0, 30)
     video.audio.write_audiofile(output_path, codec='mp3')
     video.close()
@@ -142,8 +144,7 @@ def create_zip_archive(video_urls):
     os.makedirs(os.path.dirname(zip_path), exist_ok=True)
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for url in video_urls:
-            # Здесь нужна реализация загрузки файлов по URL (например, с requests)
-            # Для примера оставим заглушку
+            # Заглушка: нужно реализовать загрузку файлов по URL
             pass
     return zip_path
 
