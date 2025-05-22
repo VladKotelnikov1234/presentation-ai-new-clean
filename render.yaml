@@ -2,20 +2,26 @@ services:
   - type: web
     name: service-lessons
     env: python
-    runtimeVersion: "3.10"  # Указываем Python 3.10 для совместимости
-    plan: free  # Бесплатный план Render (можно изменить на starter или pro при необходимости)
-    region: oregon  # Регион (можно изменить на другой, например, frankfurt)
-    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"  # Обновляем pip перед установкой зависимостей
-    startCommand: "gunicorn backend.wsgi:application --bind 0.0.0.0:8000"  # Команда запуска приложения
-    envVars:  # Переменные окружения
+    runtimeVersion: "3.10"
+    plan: starter
+    region: oregon
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "gunicorn backend.wsgi:application --bind 0.0.0.0:8000"
+    envVars:
       - key: PYTHON_VERSION
-        value: "3.10"  # Указываем версию Python
+        value: "3.10"
       - key: IOINTELLIGENCE_API_KEY
-        value: "io-v2-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJvd25lciI6IjkzNTZlN2NmLTFmNTctNGE2Yi05NjljLTQzZjI3Njg5MzI3MSIsImV4cCI6NDkwMTU0NTE5OH0.adY0csXaEhKDEc14_Ibgoe91gymgDk3YJrRifWMjoikQGzsbM0c0sGAPcZrrMYpTsXzsZm63U-E53Pssz8z-0Q"  # API-ключ IO Intelligence
+        value: "io-v2-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJvd25lciI6IjkzNTZlN2NmLTFmNTctNGE2Yi05NjljLTQzZjI3Njg5MzI3MSIsImV4cCI6NDkwMTU0NTE5OH0.adY0csXaEhKDEc14_Ibgoe91gymgDk3YJrRifWMjoikQGzsbM0c0sGAPcZrrMYpTsXzsZm63U-E53Pssz8z-0Q"
       - key: ELEVENLABS_API_KEY
-        sync: false  # Значение нужно указать вручную в Render Dashboard
+        sync: false
       - key: SYNTHESIA_API_KEY
-        sync: false  # Значение нужно указать вручную в Render Dashboard
-    autoDeploy: true  # Автоматический деплой при изменениях в репозитории
-    numInstances: 1  # Количество инстансов (1 для бесплатного плана)
-    healthCheckPath: "/"  # Путь для проверки состояния сервиса
+        sync: false
+      - key: DJANGO_SETTINGS_MODULE
+        value: "backend.settings"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: SECRET_KEY
+        sync: false
+    autoDeploy: true
+    numInstances: 1
+    healthCheckPath: "/"
