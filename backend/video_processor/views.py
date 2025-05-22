@@ -14,10 +14,9 @@ import moviepy.editor as mp
 from openai import OpenAI
 from concurrent.futures import ThreadPoolExecutor
 
-# Настройка логирования
+# Настройка логирования (в консоль, чтобы избежать проблем с /media/)
 logger = logging.getLogger(__name__)
-os.makedirs('media/logs', exist_ok=True)
-handler = logging.FileHandler('media/logs/debug_new.log', encoding='utf-8')
+handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
@@ -40,7 +39,6 @@ client = OpenAI(
     }
 )
 
-
 # Извлечение аудио из видео
 def extract_audio_from_video(video_path):
     try:
@@ -53,7 +51,6 @@ def extract_audio_from_video(video_path):
     except Exception as e:
         logger.error(f"Ошибка извлечения аудио из видео {video_path}: {e}")
         return None
-
 
 # Извлечение текста из PDF
 def extract_content_from_pdf(pdf_path):
@@ -70,24 +67,23 @@ def extract_content_from_pdf(pdf_path):
 
     return "\n".join(text_content)
 
-
 # Обработка методички и разделение на уроки
 def process_methodology_text(raw_text, test_mode=True):
     target_words = 75 if test_mode else 250  # 75 слов для 30 сек, 250 для 2 мин
     lesson_count = 3 if test_mode else 5  # 2-3 урока для теста, 5 для продакшена
 
     prompt = (
-            "Ты — преподаватель, создающий видеоуроки для любого предмета (физика, химия, программирование и т.д.). "
-            "Обработай текст методички и сделай следующее:\n"
-            "1. Фильтруй текст: оставь только ключевой контент (объяснения, формулы, уравнения, блок-схемы, код), удали титульные страницы, оглавление, информацию о вузе, кафедрах, издательствах.\n"
-            "2. Раздели текст на {lesson_count} урока по темам. Ориентируйся на {target_words} слов на урок (±25 слов).\n"
-            "3. Начинай урок с 'В этом уроке разберём...' и заканчивай 'К концу урока вы сможете...'.\n"
-            "4. Выделяй формулы (например, E=mc²), уравнения (например, H₂O → H₂ + O₂), блок-схемы (описывай текстом, например, 'Блок-схема: шаг 1 -> шаг 2'), код (с отступами) отдельно.\n"
-            "5. Адаптируйся к любому предмету: физика (законы, формулы), химия (реакции), программирование (алгоритмы).\n"
-            "6. Абзацы разделяй пустой строкой.\n"
-            "7. Формат ответа:\n"
-            "[Урок 1]\nТекст...\n\n[Урок 2]\nТекст...\n\n"
-            "Текст методички:\n" + raw_text
+        "Ты — преподаватель, создающий видеоуроки для любого предмета (физика, химия, программирование и т.д.). "
+        "Обработай текст методички и сделай следующее:\n"
+        "1. Фильтруй текст: оставь только ключевой контент (объяснения, формулы, уравнения, блок-схемы, код), удали титульные страницы, оглавление, информацию о вузе, кафедрах, издательствах.\n"
+        "2. Раздели текст на {lesson_count} урока по темам. Ориентируйся на {target_words} слов на урок (±25 слов).\n"
+        "3. Начинай урок с 'В этом уроке разберём...' и заканчивай 'К концу урока вы сможете...'.\n"
+        "4. Выделяй формулы (например, E=mc²), уравнения (например, H₂O → H₂ + O₂), блок-схемы (описывай текстом, например, 'Блок-схема: шаг 1 -> шаг 2'), код (с отступами) отдельно.\n"
+        "5. Адаптируйся к любому предмету: физика (законы, формулы), химия (реакции), программирование (алгоритмы).\n"
+        "6. Абзацы разделяй пустой строкой.\n"
+        "7. Формат ответа:\n"
+        "[Урок 1]\nТекст...\n\n[Урок 2]\nТекст...\n\n"
+        "Текст методички:\n" + raw_text
     ).format(lesson_count=lesson_count, target_words=target_words)
 
     response = client.chat.completions.create(
@@ -108,7 +104,6 @@ def process_methodology_text(raw_text, test_mode=True):
         lessons.append(current_lesson.strip())
     return lessons[:lesson_count]  # Ограничиваем количество уроков
 
-
 # Клонирование голоса и генерация аудио через ElevenLabs
 def generate_audio_with_elevenlabs(audio_path, lessons):
     voice_id = None
@@ -118,7 +113,7 @@ def generate_audio_with_elevenlabs(audio_path, lessons):
     if audio_path:
         try:
             url = "https://api.elevenlabs.io/v1/voices/add"
-            headers = {"xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "multipart/form-data"}
+            headers = {"xi-api-key": ELEVENLABS_API_KEY}
             with open(audio_path, 'rb') as audio_file:
                 files = {
                     'name': (None, 'LessonVoice'),
@@ -158,7 +153,6 @@ def generate_audio_with_elevenlabs(audio_path, lessons):
 
     return voice_id, audio_urls
 
-
 # Генерация видео через Synthesia
 def create_video_with_synthesia(lessons, audio_urls):
     video_urls = []
@@ -196,8 +190,7 @@ def create_video_with_synthesia(lessons, audio_urls):
 
             video_url = None
             for _ in range(30):
-                status_response = requests.get(f"https://api.synthesia.io/v2/videos/{video_id}", headers=headers,
-                                               timeout=30)
+                status_response = requests.get(f"https://api.synthesia.io/v2/videos/{video_id}", headers=headers, timeout=30)
                 status_response.raise_for_status()
                 status = status_response.json().get("status")
                 if status == "complete":
@@ -222,7 +215,6 @@ def create_video_with_synthesia(lessons, audio_urls):
 
     return video_urls
 
-
 # Создание ZIP-архива
 def create_zip_archive(video_files):
     zip_path = os.path.join(OUTPUT_DIR, 'lessons.zip')
@@ -232,19 +224,19 @@ def create_zip_archive(video_files):
     logger.info(f"Создан архив: {zip_path}")
     return zip_path
 
-
 # Django View для загрузки и обработки файлов
 @method_decorator(csrf_exempt, name='dispatch')
 class UploadView(View):
     def post(self, request, *args, **kwargs):
         test_mode = True  # Переключатель для теста (2-3 урока по 30 сек), False для 5 уроков по 2 мин
         try:
-            pdf_file = request.FILES.get('pdf_file')
-            media_file = request.FILES.get('media_file')
+            pdf_file = request.FILES.get('file')  # Исправлено с pdf_file на file, чтобы соответствовать App.js
+            media_file = request.FILES.get('video_file')  # Исправлено с media_file на video_file
 
             if not pdf_file:
                 return JsonResponse({'error': 'PDF файл обязателен'}, status=400)
 
+            # Создаём директории для файлов
             pdf_path = os.path.join(MEDIA_ROOT, 'uploads', pdf_file.name)
             media_path = os.path.join(MEDIA_ROOT, 'uploads', media_file.name) if media_file else None
             os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
@@ -258,7 +250,7 @@ class UploadView(View):
 
             # Извлечение аудио из видео, если загружено видео
             audio_path = None
-            if media_path and media_path.endswith(('.mp4', '.avi')):
+            if media_path and media_file.name.endswith(('.mp4', '.avi')):
                 audio_path = extract_audio_from_video(media_path)
                 if not audio_path:
                     return JsonResponse({'error': 'Не удалось извлечь аудио из видео'}, status=500)
