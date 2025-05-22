@@ -69,8 +69,14 @@ def extract_content_from_pdf(pdf_path):
 
 # Обработка методички и разделение на уроки
 def process_methodology_text(raw_text, test_mode=True):
-    target_words = 75 if test_mode else 250  # 75 слов для 30 сек, 250 для 2 мин
-    lesson_count = 3 if test_mode else 5  # 2-3 урока для теста, 5 для продакшена
+    target_words = 75 if test_mode else 250
+    lesson_count = 3 if test_mode else 5
+
+    if not OPENROUTER_API_KEY:
+        logger.error("OPENROUTER_API_KEY не задан")
+        return None
+
+    logger.info(f"Используется OPENROUTER_API_KEY: {OPENROUTER_API_KEY[:5]}...")
 
     prompt = (
         "Ты — преподаватель, создающий видеоуроки для любого предмета (физика, химия, программирование и т.д.). "
@@ -86,23 +92,36 @@ def process_methodology_text(raw_text, test_mode=True):
         "Текст методички:\n" + raw_text
     ).format(lesson_count=lesson_count, target_words=target_words)
 
-    response = client.chat.completions.create(
-        model="google/gemini-2.5-pro-preview",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    content = response.choices[0].message.content
-    lessons = []
-    current_lesson = ""
-    for line in content.split('\n'):
-        if line.startswith('[Урок'):
-            if current_lesson:
-                lessons.append(current_lesson.strip())
-            current_lesson = line + "\n"
-        else:
-            current_lesson += line + "\n"
-    if current_lesson:
-        lessons.append(current_lesson.strip())
-    return lessons[:lesson_count]  # Ограничиваем количество уроков
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://service-lessons.onrender.com",
+        "X-Title": "VideoLessonService"
+    }
+    data = {
+        "model": "deepseek/deepseek-r1",  # Заменили модель
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    try:
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=30)
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"]
+        lessons = []
+        current_lesson = ""
+        for line in content.split('\n'):
+            if line.startswith('[Урок'):
+                if current_lesson:
+                    lessons.append(current_lesson.strip())
+                current_lesson = line + "\n"
+            else:
+                current_lesson += line + "\n"
+        if current_lesson:
+            lessons.append(current_lesson.strip())
+        return lessons[:lesson_count]
+    except Exception as e:
+        logger.error(f"Ошибка вызова OpenRouter API: {e}")
+        return None
 
 # Клонирование голоса и генерация аудио через ElevenLabs
 def generate_audio_with_elevenlabs(audio_path, lessons):
