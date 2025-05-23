@@ -8,5 +8,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('video_processor.urls')),
     path('', TemplateView.as_view(template_name='index.html')),  # Главная страница фронтенда
-    re_path(r'^(?!api/).*', TemplateView.as_view(template_name='index.html')),  # Все маршруты, кроме API, отдают index.html
+    re_path(r'^(?!api/).*', TemplateView.as_view(template_name='index.html')),  # Все маршруты, кроме API
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
