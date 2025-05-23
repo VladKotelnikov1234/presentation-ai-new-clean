@@ -3,7 +3,7 @@ services:
     name: service-lessons
     env: python
     runtime: python3.10
-    buildCommand: "/opt/render/project/.venv/bin/python3.10 -m pip install --upgrade pip && /opt/render/project/.venv/bin/python3.10 -m pip install -r requirements.txt && cd backend && /opt/render/project/.venv/bin/python3.10 manage.py collectstatic --noinput && ls -R staticfiles && /opt/render/project/.venv/bin/python3.10 manage.py migrate"
+    buildCommand: "/opt/render/project/.venv/bin/python3.10 -m pip install --upgrade pip && /opt/render/project/.venv/bin/python3.10 -m pip install -r requirements.txt && cd /opt/render/project/src/backend && /opt/render/project/.venv/bin/python3.10 manage.py collectstatic --noinput --verbosity 2 && ls -R staticfiles && /opt/render/project/.venv/bin/python3.10 manage.py migrate"
     startCommand: "/opt/render/project/.venv/bin/python3.10 -m gunicorn backend.wsgi:application --bind 0.0.0.0:${PORT}"
     envVars:
       - key: PYTHON_VERSION
