@@ -6,17 +6,12 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 import requests
 import pdfplumber
-from moviepy.editor import VideoFileClip
 import zipfile
 
 logger = logging.getLogger(__name__)
 from django.conf import settings
 
 # Получение ключей из переменных окружения с проверкой
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-if not ELEVENLABS_API_KEY:
-    logger.error("ELEVENLABS_API_KEY не задан")
-    raise ValueError("Отсутствует API ключ для ElevenLabs")
 SYNTHESIA_API_KEY = os.getenv("SYNTHESIA_API_KEY", "")
 if not SYNTHESIA_API_KEY:
     logger.error("SYNTHESIA_API_KEY не задан")
@@ -38,11 +33,11 @@ def extract_content_from_pdf(pdf_path, max_pages=3):
     return "\n".join(text_content)[:2000]
 
 def process_methodology_text(raw_text, test_mode=True, model="meta-llama/Llama-3.3-70B-Instruct"):
-    """Обрабатывает текст и создаёт один короткий урок с помощью IO Intelligence API."""
-    target_words = 75
+    """Обрабатывает текст и создаёт один короткий урок (1 минута, ~120 слов) с помощью IO Intelligence API."""
+    target_words = 120  # ~1 минута при скорости 120-150 слов/мин
     lesson_count = 1
     prompt = (
-        "Ты — преподаватель. Обрабатай текст методички (2000 символов) и создай 1 урок (75 слов): "
+        "Ты — преподаватель. Обрабатай текст методички (2000 символов) и создай 1 урок (120 слов): "
         "1. Фильтруй: оставь объяснения, формулы (E=mc²), уравнения (H₂O → H₂ + O₂), код.\n"
         "2. Начни с 'В этом уроке разберём...' и закончи 'К концу урока вы сможете...'.\n"
         "3. Абзацы разделяй пустой строкой.\n"
@@ -71,130 +66,76 @@ def process_methodology_text(raw_text, test_mode=True, model="meta-llama/Llama-3
         logger.error(f"Ошибка IO Intelligence API: {e.response.status_code if e.response else 'N/A'} - {e.response.text if e.response else str(e)}")
         return None
 
-def extract_audio_from_video(video_path):
-    """Извлекает аудио из видео и ограничивает длительность."""
-    output_path = video_path.replace('.mp4', '.mp3').replace('.avi', '.mp3')
-    video = VideoFileClip(video_path)
-    if video.duration > 30:
-        video = video.subclip(0, 30)
-    video.audio.write_audiofile(output_path, codec='mp3')
-    video.close()
-    return output_path
-
-def create_custom_voice(audio_path):
-    """Создаёт кастомный голос через ElevenLabs."""
+def create_video_with_synthesia(lessons, max_duration=60):
+    """Создаёт видео через Synthesia без аватара с ограничением длительности (1 минута)."""
     headers = {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
+        "Authorization": f"Bearer {SYNTHESIA_API_KEY}",
+        "Content-Type": "application/json"
     }
-    with open(audio_path, "rb") as audio_file:
-        files = {
-            "file": (os.path.basename(audio_path), audio_file, "audio/mpeg")
-        }
-        data = {
-            "name": f"CustomVoice_{os.path.basename(audio_path)}",
-            "description": "Голос пользователя из загруженного аудио",
-            "labels": {"user_generated": "true"}
-        }
-        try:
-            response = requests.post(
-                "https://api.elevenlabs.io/v1/voices/add",
-                headers=headers,
-                files=files,
-                data=data,
-                timeout=60
-            )
-            response.raise_for_status()
-            voice_id = response.json()["voice_id"]
-            logger.info(f"Создан кастомный голос с ID: {voice_id}")
-            return voice_id
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Ошибка создания голоса: {e.response.status_code if e.response else 'N/A'} - {e.response.text if e.response else str(e)}")
-            return None
-
-def generate_audio_with_elevenlabs(audio_path, lessons, max_duration=30):
-    """Генерирует аудио через ElevenLabs с кастомным голосом."""
-    headers = {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Accept": "audio/mpeg"
-    }
-    audio_urls = []
-    # Создаём кастомный голос из загруженного аудио
-    voice_id = create_custom_voice(audio_path)
-    if not voice_id:
-        logger.error("Не удалось создать кастомный голос")
-        return None, None
+    video_urls = []
     for lesson in lessons:
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-        data = {
-            "text": lesson,
-            "model_id": "eleven_monolingual_v1",
-            "voice_settings": {
-                "stability": 0.5,
-                "similarity_boost": 0.5
+        payload = {
+            "title": "Video Lesson",
+            "script": {
+                "text": lesson,
+                "avatar": None,  # Отключаем аватар
+                "voice": "en-US-male-1",  # Голос по умолчанию (замените на нужный)
+                "duration": max_duration  # 60 секунд
+            },
+            "output": {
+                "format": "mp4"
             }
         }
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=30)
-            if response.status_code == 200:
-                audio_file_path = os.path.join(settings.MEDIA_ROOT, 'audio', f"lesson_{len(audio_urls)}.mp3")
-                os.makedirs(os.path.dirname(audio_file_path), exist_ok=True)
-                with open(audio_file_path, 'wb') as f:
-                    f.write(response.content)
-                audio_url = f"/media/audio/lesson_{len(audio_urls)}.mp3"
-                audio_urls.append(audio_url)
+            response = requests.post("https://api.synthesia.io/v2/videos", headers=headers, json=payload, timeout=60)
+            if response.status_code == 201:
+                video_data = response.json()
+                video_url = video_data.get("outputUrl")
+                video_urls.append(video_url)
+                logger.info(f"Видео создано: {video_url}")
             else:
-                logger.error(f"Ошибка ElevenLabs: {response.status_code} - {response.text}")
-                return None, None
+                logger.error(f"Ошибка Synthesia: {response.status_code} - {response.text}")
+                return None
         except requests.exceptions.RequestException as e:
-            logger.error(f"Ошибка запроса к ElevenLabs: {e}")
-            return None, None
-    return voice_id, audio_urls
-
-def create_video_with_synthesia(lessons, audio_urls, max_duration=30):
-    """Создаёт видео через Synthesia с ограничением длительности."""
-    headers = {"X-API-Key": SYNTHESIA_API_KEY}
-    video_urls = []
-    for lesson, audio_url in zip(lessons, audio_urls):
-        data = {"script": lesson, "audio_url": audio_url, "duration": max_duration}
-        response = requests.post("https://api.synthesia.io/v2/videos", headers=headers, json=data)
-        if response.status_code == 200:
-            video_urls.append(response.json()["video_url"])
-        else:
-            logger.error(f"Ошибка Synthesia: {response.status_code} - {response.text}")
+            logger.error(f"Ошибка запроса к Synthesia: {e}")
             return None
     return video_urls
 
 def create_zip_archive(video_urls):
-    """Создаёт ZIP-архив с видео."""
+    """Создаёт ZIP-архив с видео, загружая их по URL."""
     zip_path = os.path.join(settings.MEDIA_ROOT, 'outputs', 'lessons.zip')
     os.makedirs(os.path.dirname(zip_path), exist_ok=True)
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for url in video_urls:
-            # Заглушка: нужно реализовать загрузку файлов по URL
-            pass
+        for i, url in enumerate(video_urls):
+            try:
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+                video_path = os.path.join(settings.MEDIA_ROOT, 'outputs', f"lesson_{i}.mp4")
+                with open(video_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                zipf.write(video_path, f"lesson_{i}.mp4")
+                os.remove(video_path)  # Удаляем временный файл
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Ошибка загрузки видео по URL {url}: {e}")
+                return None
     return zip_path
 
 @method_decorator(csrf_exempt, name='dispatch')
 class UploadView(View):
     def post(self, request, *args, **kwargs):
         test_mode = True
-        model = request.POST.get('model', 'meta-llama/Llama-3.3-70B-Instruct')  # Добавлен параметр модели
+        model = request.POST.get('model', 'meta-llama/Llama-3.3-70B-Instruct')
         try:
             pdf_file = request.FILES.get('file')
-            video_file = request.FILES.get('video_file')
-            if not pdf_file or not video_file:
-                return JsonResponse({'error': 'PDF и видео/аудио файлы обязательны'}, status=400)
+            if not pdf_file:
+                return JsonResponse({'error': 'PDF файл обязателен'}, status=400)
             pdf_path = os.path.join(settings.MEDIA_ROOT, 'uploads', pdf_file.name)
-            video_path = os.path.join(settings.MEDIA_ROOT, 'uploads', video_file.name)
             os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
             with open(pdf_path, 'wb') as f:
                 for chunk in pdf_file.chunks():
                     f.write(chunk)
-            with open(video_path, 'wb') as f:
-                for chunk in video_file.chunks():
-                    f.write(chunk)
-            audio_path = extract_audio_from_video(video_path) if video_file.name.endswith(('.mp4', '.avi')) else video_path
             raw_text = extract_content_from_pdf(pdf_path)
             logger.info(f"Извлечён текст из PDF, длина: {len(raw_text)} символов")
             if not raw_text or len(raw_text.strip()) == 0:
@@ -202,13 +143,12 @@ class UploadView(View):
             lessons = process_methodology_text(raw_text, test_mode, model=model)
             if not lessons:
                 return JsonResponse({'error': 'Не удалось обработать текст в уроки'}, status=500)
-            voice_id, audio_urls = generate_audio_with_elevenlabs(audio_path, lessons, max_duration=30)
-            if not audio_urls:
-                return JsonResponse({'error': 'Не удалось сгенерировать аудио через ElevenLabs'}, status=500)
-            video_urls = create_video_with_synthesia(lessons, audio_urls, max_duration=30)
+            video_urls = create_video_with_synthesia(lessons, max_duration=60)
             if not video_urls:
                 return JsonResponse({'error': 'Не удалось сгенерировать видео через Synthesia'}, status=500)
             zip_path = create_zip_archive(video_urls)
+            if not zip_path:
+                return JsonResponse({'error': 'Не удалось создать ZIP архив'}, status=500)
             archive_url = f"/media/outputs/lessons.zip"
             return JsonResponse({'archive_url': archive_url})
         except Exception as e:
