@@ -8,6 +8,8 @@ from django.views.decorators.csrf import csrf_exempt
 import requests
 import zipfile
 import time
+from celery.result import AsyncResult
+from .tasks import generate_videos_task
 
 logger = logging.getLogger(__name__)
 from django.conf import settings
@@ -86,7 +88,7 @@ def create_video_with_heygen(lessons, max_duration=30, max_retries=3):
                         return None
                     video_id = video_data["data"]["video_id"]
                     video_status_url = f"https://api.heygen.com/v1/video_status.get?video_id={video_id}"
-                    for _ in range(20):
+                    for _ in range(60):  # Проверяем до 5 минут (60 * 5 секунд)
                         status_response = requests.get(
                             video_status_url,
                             headers=headers,
@@ -107,12 +109,12 @@ def create_video_with_heygen(lessons, max_duration=30, max_retries=3):
                                 return None
                             elif status in ["processing", "pending"]:
                                 logger.info(f"Видео {i} обрабатывается, ждем...")
-                                time.sleep(30)
+                                time.sleep(5)  # Уменьшено с 30 до 5 секунд
                         else:
                             logger.error(f"Ошибка проверки статуса: {status_response.status_code} - {status_response.text}")
                             return None
                     else:
-                        logger.error(f"Видео {i} не было готово после 10 минут ожидания")
+                        logger.error(f"Видео {i} не было готово после 5 минут ожидания")
                         return None
                     break
                 else:
@@ -159,14 +161,9 @@ class UploadView(View):
                 "В этом уроке разберём основы. Это пример текста для первого тестового видео на русском языке.",
                 "В этом уроке продолжим изучение. Это пример текста для второго тестового видео на русском языке."
             ]
-            video_urls = create_video_with_heygen(lessons, max_duration=30)
-            if not video_urls:
-                return JsonResponse({'error': 'Не удалось сгенерировать видео через HeyGen'}, status=500)
-            zip_path = create_zip_archive(video_urls)
-            if not zip_path:
-                return JsonResponse({'error': 'Не удалось создать ZIP архив'}, status=500)
-            archive_url = f"/media/outputs/lessons.zip"
-            return JsonResponse({'archive_url': archive_url})
+            # Запускаем задачу асинхронно
+            task = generate_videos_task.delay(lessons, max_duration=30)
+            return JsonResponse({'task_id': task.id, 'status': 'Task started. Check status later.'})
         except Exception as e:
             logger.error(f"Ошибка обработки: {e}")
             return JsonResponse({'error': str(e)}, status=500)
@@ -175,3 +172,20 @@ class UploadView(View):
 class ListModelsView(View):
     def get(self, request, *args, **kwargs):
         return JsonResponse({"message": "This endpoint is not implemented yet"}, status=200)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class TaskStatusView(View):
+    def get(self, request, *args, **kwargs):
+        task_id = request.GET.get('task_id')
+        if not task_id:
+            return JsonResponse({'error': 'Task ID required'}, status=400)
+        task = AsyncResult(task_id)
+        if task.state == 'SUCCESS':
+            result = task.result
+            if result:
+                return JsonResponse({'status': 'completed', 'archive_url': f"/media/outputs/lessons.zip"})
+            return JsonResponse({'status': 'failed', 'error': 'Task completed but failed to generate archive'})
+        elif task.state == 'FAILURE':
+            return JsonResponse({'status': 'failed', 'error': str(task.result)}, status=500)
+        else:
+            return JsonResponse({'status': task.state})
