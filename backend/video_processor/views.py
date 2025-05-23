@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 import requests
 import pdfplumber
 import zipfile
+import time
 
 logger = logging.getLogger(__name__)
 from django.conf import settings
@@ -67,32 +68,66 @@ def process_methodology_text(raw_text, test_mode=True, model="meta-llama/Llama-3
         return None
 
 def create_video_with_synthesia(lessons, max_duration=60):
-    """Создаёт видео через Synthesia без аватара с ограничением длительности (1 минута)."""
+    """Создаёт тестовое видео через Synthesia без аватара с русским голосом (или без озвучки, если голос недоступен)."""
     headers = {
         "Authorization": f"Bearer {SYNTHESIA_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
     }
     video_urls = []
+    # Пробуем русский голос (например, ru-RU-male-1, проверьте доступные голоса через API)
+    available_voices = ["ru-RU-male-1"]  # Замените на актуальный ID голоса
+    fallback_voice = None  # Без озвучки, если русский голос недоступен
+
     for lesson in lessons:
         payload = {
-            "title": "Video Lesson",
-            "script": {
-                "text": lesson,
-                "avatar": None,  # Отключаем аватар
-                "voice": "en-US-male-1",  # Голос по умолчанию (замените на нужный)
-                "duration": max_duration  # 60 секунд
-            },
-            "output": {
-                "format": "mp4"
-            }
+            "title": "Generated Video Lesson",
+            "description": "A short test video lesson",
+            "visibility": "private",
+            "test": True,  # Тестовый режим, не расходует кредиты
+            "aspectRatio": "16:9",
+            "input": [
+                {
+                    "scriptText": lesson,
+                    "avatar": "",  # Отключаем аватар
+                    "voice": available_voices[0] if available_voices else fallback_voice,
+                    "background": "default"
+                }
+            ]
         }
+        logger.info(f"Отправка запроса к Synthesia API: {payload}")
         try:
-            response = requests.post("https://api.synthesia.io/v2/videos", headers=headers, json=payload, timeout=60)
+            response = requests.post(
+                "https://api.synthesia.io/v2/videos",
+                headers=headers,
+                json=payload,
+                timeout=60
+            )
+            logger.info(f"Ответ от Synthesia: {response.status_code} - {response.text}")
             if response.status_code == 201:
                 video_data = response.json()
-                video_url = video_data.get("outputUrl")
-                video_urls.append(video_url)
-                logger.info(f"Видео создано: {video_url}")
+                video_id = video_data.get("id")
+                logger.info(f"Видео создано с ID: {video_id}")
+                
+                # Проверка статуса видео
+                for _ in range(10):  # Проверяем до 10 раз (5 минут)
+                    status_response = requests.get(
+                        f"https://api.synthesia.io/v2/videos/{video_id}",
+                        headers=headers,
+                        timeout=30
+                    )
+                    if status_response.status_code == 200:
+                        status_data = status_response.json()
+                        if status_data.get("status") == "complete":
+                            video_url = status_data.get("downloadUrl")
+                            if video_url:
+                                video_urls.append(video_url)
+                                logger.info(f"Видео готово: {video_url}")
+                                break
+                    time.sleep(30)  # Ждем 30 секунд
+                else:
+                    logger.error("Видео не было готово после 5 минут ожидания")
+                    return None
             else:
                 logger.error(f"Ошибка Synthesia: {response.status_code} - {response.text}")
                 return None
