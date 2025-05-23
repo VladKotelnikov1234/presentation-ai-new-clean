@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import logging
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,7 +27,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
+    'django.middleware.commonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -38,7 +39,7 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'static'],  # Добавляем папку static для поиска index.html
+        'DIRS': [BASE_DIR / 'static'],  # Для поиска index.html фронтенда
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -84,10 +85,9 @@ ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 SYNTHESIA_API_KEY = os.getenv('SYNTHESIA_API_KEY')
 IOINTELLIGENCE_API_KEY = os.getenv('IOINTELLIGENCE_API_KEY')
 
-#if not ELEVENLABS_API_KEY or not SYNTHESIA_API_KEY or not IOINTELLIGENCE_API_KEY:
-    #import logging
-    #logger = logging.getLogger(__name__)
-    #logger.error("Одна или несколько API-ключи не заданы")
-    #raise ValueError("Отсутствуют необходимые API-ключи")
+# Временное отключение проверки API-ключей для деплоя
+# if not ELEVENLABS_API_KEY or not SYNTHESIA_API_KEY or not IOINTELLIGENCE_API_KEY:
+#     logger.error("Одна или несколько API-ключи не заданы")
+#     raise ValueError("Отсутствуют необходимые API-ключи")
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
