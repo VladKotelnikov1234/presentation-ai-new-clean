@@ -8,8 +8,6 @@ from django.views.decorators.csrf import csrf_exempt
 import requests
 import zipfile
 import time
-from celery.result import AsyncResult
-from .tasks import generate_videos_task
 
 logger = logging.getLogger(__name__)
 from django.conf import settings
@@ -161,9 +159,14 @@ class UploadView(View):
                 "В этом уроке разберём основы. Это пример текста для первого тестового видео на русском языке.",
                 "В этом уроке продолжим изучение. Это пример текста для второго тестового видео на русском языке."
             ]
-            # Запускаем задачу асинхронно
-            task = generate_videos_task.delay(lessons, max_duration=30)
-            return JsonResponse({'task_id': task.id, 'status': 'Task started. Check status later.'})
+            video_urls = create_video_with_heygen(lessons, max_duration=30)
+            if not video_urls:
+                return JsonResponse({'error': 'Не удалось сгенерировать видео через HeyGen'}, status=500)
+            zip_path = create_zip_archive(video_urls)
+            if not zip_path:
+                return JsonResponse({'error': 'Не удалось создать ZIP архив'}, status=500)
+            archive_url = f"/media/outputs/lessons.zip"
+            return JsonResponse({'archive_url': archive_url})
         except Exception as e:
             logger.error(f"Ошибка обработки: {e}")
             return JsonResponse({'error': str(e)}, status=500)
@@ -172,20 +175,3 @@ class UploadView(View):
 class ListModelsView(View):
     def get(self, request, *args, **kwargs):
         return JsonResponse({"message": "This endpoint is not implemented yet"}, status=200)
-
-@method_decorator(csrf_exempt, name='dispatch')
-class TaskStatusView(View):
-    def get(self, request, *args, **kwargs):
-        task_id = request.GET.get('task_id')
-        if not task_id:
-            return JsonResponse({'error': 'Task ID required'}, status=400)
-        task = AsyncResult(task_id)
-        if task.state == 'SUCCESS':
-            result = task.result
-            if result:
-                return JsonResponse({'status': 'completed', 'archive_url': f"/media/outputs/lessons.zip"})
-            return JsonResponse({'status': 'failed', 'error': 'Task completed but failed to generate archive'})
-        elif task.state == 'FAILURE':
-            return JsonResponse({'status': 'failed', 'error': str(task.result)}, status=500)
-        else:
-            return JsonResponse({'status': task.state})
