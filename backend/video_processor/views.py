@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 from django.conf import settings
 
 # Получение ключей из переменных окружения с проверкой
-SYNTHESIA_API_KEY = os.getenv("SYNTHESIA_API_KEY", "")
+SYNTHESIA_API_KEY = os.getenv("SYNTHESIA_API_KEY", "").strip()
 if not SYNTHESIA_API_KEY:
     logger.error("SYNTHESIA_API_KEY не задан")
     raise ValueError("Отсутствует API ключ для Synthesia")
-IOINTELLIGENCE_API_KEY = os.getenv("IOINTELLIGENCE_API_KEY", "io-v2-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJvd25lciI6IjkzNTZlN2NmLTFmNTctNGE2Yi05NjljLTQzZjI3Njg5MzI3MSIsImV4cCI6NDkwMTU0NTE5OH0.adY0csXaEhKDEc14_Ibgoe91gymgDk3YJrRifWMjoikQGzsbM0c0sGAPcZrrMYpTsXzsZm63U-E53Pssz8z-0Q")
+IOINTELLIGENCE_API_KEY = os.getenv("IOINTELLIGENCE_API_KEY", "io-v2-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJvd25lciI6IjkzNTZlN2NmLTFmNTctNGE2Yi05NjljLTQzZjI3Njg5MzI3MSIsImV4cCI6NDkwMTU0NTE5OH0.adY0csXaEhKDEc14_Ibgoe91gymgDk3YJrRifWMjoikQGzsbM0c0sGAPcZrrMYpTsXzsZm63U-E53Pssz8z-0Q").strip()
 if not IOINTELLIGENCE_API_KEY:
     logger.error("IOINTELLIGENCE_API_KEY не задан")
     raise ValueError("Отсутствует API ключ для IO Intelligence")
@@ -74,22 +74,23 @@ def create_video_with_synthesia(lessons, max_duration=60):
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
+    logger.info(f"Формируемый заголовок Authorization: {headers['Authorization']}")
     video_urls = []
-    # Пробуем русский голос (например, ru-RU-male-1, проверьте доступные голоса через API)
-    available_voices = ["ru-RU-male-1"]  # Замените на актуальный ID голоса
-    fallback_voice = None  # Без озвучки, если русский голос недоступен
+    # Пробуем русский голос (замените после проверки доступных голосов)
+    available_voices = ["ru-RU-male-1"]
+    fallback_voice = None
 
     for lesson in lessons:
         payload = {
             "title": "Generated Video Lesson",
             "description": "A short test video lesson",
             "visibility": "private",
-            "test": True,  # Тестовый режим, не расходует кредиты
+            "test": True,
             "aspectRatio": "16:9",
             "input": [
                 {
                     "scriptText": lesson,
-                    "avatar": "",  # Отключаем аватар
+                    "avatar": "",
                     "voice": available_voices[0] if available_voices else fallback_voice,
                     "background": "default"
                 }
@@ -108,9 +109,7 @@ def create_video_with_synthesia(lessons, max_duration=60):
                 video_data = response.json()
                 video_id = video_data.get("id")
                 logger.info(f"Видео создано с ID: {video_id}")
-                
-                # Проверка статуса видео
-                for _ in range(10):  # Проверяем до 10 раз (5 минут)
+                for _ in range(10):
                     status_response = requests.get(
                         f"https://api.synthesia.io/v2/videos/{video_id}",
                         headers=headers,
@@ -124,7 +123,7 @@ def create_video_with_synthesia(lessons, max_duration=60):
                                 video_urls.append(video_url)
                                 logger.info(f"Видео готово: {video_url}")
                                 break
-                    time.sleep(30)  # Ждем 30 секунд
+                    time.sleep(30)
                 else:
                     logger.error("Видео не было готово после 5 минут ожидания")
                     return None
@@ -151,7 +150,7 @@ def create_zip_archive(video_urls):
                         if chunk:
                             f.write(chunk)
                 zipf.write(video_path, f"lesson_{i}.mp4")
-                os.remove(video_path)  # Удаляем временный файл
+                os.remove(video_path)
             except requests.exceptions.RequestException as e:
                 logger.error(f"Ошибка загрузки видео по URL {url}: {e}")
                 return None
