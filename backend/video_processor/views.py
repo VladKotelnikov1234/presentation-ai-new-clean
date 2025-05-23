@@ -12,11 +12,8 @@ import time
 logger = logging.getLogger(__name__)
 from django.conf import settings
 
-# Получение ключей из переменных окружения с проверкой
-SYNTHESIA_API_KEY = os.getenv("SYNTHESIA_API_KEY", "").strip()
-if not SYNTHESIA_API_KEY:
-    logger.error("SYNTHESIA_API_KEY не задан")
-    raise ValueError("Отсутствует API ключ для Synthesia")
+# Использование предоставленного API-ключа
+COLOSSYAN_API_KEY = "04bcd0c242ce5a7b12d308325ec89659"
 IOINTELLIGENCE_API_KEY = os.getenv("IOINTELLIGENCE_API_KEY", "io-v2-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJvd25lciI6IjkzNTZlN2NmLTFmNTctNGE2Yi05NjljLTQzZjI3Njg5MzI3MSIsImV4cCI6NDkwMTU0NTE5OH0.adY0csXaEhKDEc14_Ibgoe91gymgDk3YJrRifWMjoikQGzsbM0c0sGAPcZrrMYpTsXzsZm63U-E53Pssz8z-0Q").strip()
 if not IOINTELLIGENCE_API_KEY:
     logger.error("IOINTELLIGENCE_API_KEY не задан")
@@ -34,12 +31,11 @@ def extract_content_from_pdf(pdf_path, max_pages=3):
     return "\n".join(text_content)[:2000]
 
 def process_methodology_text(raw_text, test_mode=True, model="meta-llama/Llama-3.3-70B-Instruct"):
-    """Обрабатывает текст и создаёт один короткий урок (1 минута, ~120 слов) с помощью IO Intelligence API."""
-    target_words = 120  # ~1 минута при скорости 120-150 слов/мин
-    lesson_count = 1
+    """Обрабатывает текст и создаёт один урок (примерно 60 слов для 30 секунд)."""
+    target_words = 60  # ~30 секунд при скорости 120 слов/мин
     prompt = (
-        "Ты — преподаватель. Обрабатай текст методички (2000 символов) и создай 1 урок (120 слов): "
-        "1. Фильтруй: оставь объяснения, формулы (E=mc²), уравнения (H₂O → H₂ + O₂), код.\n"
+        "Ты — преподаватель. Обрабатай текст методички (2000 символов) и создай 1 короткий урок (60 слов): "
+        "1. Фильтруй: оставь объяснения, формулы (E=mc²), уравнения (H₂O → H₂ + O₂).\n"
         "2. Начни с 'В этом уроке разберём...' и закончи 'К концу урока вы сможете...'.\n"
         "3. Абзацы разделяй пустой строкой.\n"
         "Текст: " + raw_text
@@ -64,74 +60,66 @@ def process_methodology_text(raw_text, test_mode=True, model="meta-llama/Llama-3
         lesson = response.json()["choices"][0]["message"]["content"]
         return [lesson]
     except requests.exceptions.RequestException as e:
-        logger.error(f"Ошибка IO Intelligence API: {e.response.status_code if e.response else 'N/A'} - {e.response.text if e.response else str(e)}")
+        logger.error(f"Ошибка IO Intelligence API: {e}")
         return None
 
-def create_video_with_synthesia(lessons, max_duration=60):
-    """Создаёт тестовое видео через Synthesia без аватара с русским голосом (или без озвучки, если голос недоступен)."""
-    headers = {
-        "Authorization": f"Bearer {SYNTHESIA_API_KEY}",
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
-    logger.info(f"Формируемый заголовок Authorization: {headers['Authorization']}")
+def create_video_with_colossyan(lessons, max_duration=30):
+    """Создаёт тестовое видео на 30 секунд через Colossyan с автоматическим подбором шаблонов."""
     video_urls = []
-    # Пробуем русский голос (замените после проверки доступных голосов)
-    available_voices = ["ru-RU-male-1"]
-    fallback_voice = None
+    headers = {
+        "Authorization": f"Bearer {COLOSSYAN_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-    for lesson in lessons:
+    for i, lesson in enumerate(lessons):
+        # Формируем запрос на создание видео
         payload = {
-            "title": "Generated Video Lesson",
-            "description": "A short test video lesson",
-            "visibility": "private",
-            "test": True,
-            "aspectRatio": "16:9",
-            "input": [
-                {
-                    "scriptText": lesson,
-                    "avatar": "",
-                    "voice": available_voices[0] if available_voices else fallback_voice,
-                    "background": "default"
-                }
-            ]
+            "script": lesson[:500],  # Ограничение текста
+            "avatar": "default",  # Используем стандартного аватара
+            "language": "ru-RU",  # Русский язык
+            "duration": max_duration,  # Длительность в секундах
+            "auto_style": True  # Автоматический подбор стиля
         }
-        logger.info(f"Отправка запроса к Synthesia API: {payload}")
+        logger.info(f"Отправка запроса к Colossyan API: {payload}")
         try:
+            # Отправляем запрос на создание видео
             response = requests.post(
-                "https://api.synthesia.io/v2/videos",
+                "https://api.colossyan.com/v1/videos/generate",
                 headers=headers,
                 json=payload,
                 timeout=60
             )
-            logger.info(f"Ответ от Synthesia: {response.status_code} - {response.text}")
-            if response.status_code == 201:
+            logger.info(f"Ответ от Colossyan: {response.status_code} - {response.text}")
+            if response.status_code == 200:
                 video_data = response.json()
-                video_id = video_data.get("id")
-                logger.info(f"Видео создано с ID: {video_id}")
-                for _ in range(10):
+                job_id = video_data["job_id"]
+                # Опрос статуса задачи
+                for _ in range(20):  # Проверяем до 10 минут
                     status_response = requests.get(
-                        f"https://api.synthesia.io/v2/videos/{video_id}",
+                        f"https://api.colossyan.com/v1/videos/jobs/{job_id}",
                         headers=headers,
                         timeout=30
                     )
                     if status_response.status_code == 200:
                         status_data = status_response.json()
-                        if status_data.get("status") == "complete":
-                            video_url = status_data.get("downloadUrl")
+                        if status_data["status"] == "completed":
+                            video_url = status_data["video_url"]
                             if video_url:
                                 video_urls.append(video_url)
                                 logger.info(f"Видео готово: {video_url}")
                                 break
+                        elif status_data["status"] == "failed":
+                            logger.error(f"Рендеринг завершился с ошибкой: {status_data.get('error')}")
+                            return None
                     time.sleep(30)
                 else:
-                    logger.error("Видео не было готово после 5 минут ожидания")
+                    logger.error("Видео не было готово после 10 минут ожидания")
                     return None
             else:
-                logger.error(f"Ошибка Synthesia: {response.status_code} - {response.text}")
+                logger.error(f"Ошибка Colossyan: {response.status_code} - {response.text}")
                 return None
         except requests.exceptions.RequestException as e:
-            logger.error(f"Ошибка запроса к Synthesia: {e}")
+            logger.error(f"Ошибка запроса к Colossyan: {e}")
             return None
     return video_urls
 
@@ -162,24 +150,14 @@ class UploadView(View):
         test_mode = True
         model = request.POST.get('model', 'meta-llama/Llama-3.3-70B-Instruct')
         try:
-            pdf_file = request.FILES.get('file')
-            if not pdf_file:
-                return JsonResponse({'error': 'PDF файл обязателен'}, status=400)
-            pdf_path = os.path.join(settings.MEDIA_ROOT, 'uploads', pdf_file.name)
-            os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
-            with open(pdf_path, 'wb') as f:
-                for chunk in pdf_file.chunks():
-                    f.write(chunk)
-            raw_text = extract_content_from_pdf(pdf_path)
-            logger.info(f"Извлечён текст из PDF, длина: {len(raw_text)} символов")
-            if not raw_text or len(raw_text.strip()) == 0:
-                return JsonResponse({'error': 'Текст из PDF пуст или не извлечён'}, status=500)
-            lessons = process_methodology_text(raw_text, test_mode, model=model)
+            # Тестовый сценарий: используем фиксированный текст вместо PDF
+            test_text = "Пример текста для тестового урока. Включает объяснения и формулы."
+            lessons = process_methodology_text(test_text, test_mode, model=model)
             if not lessons:
                 return JsonResponse({'error': 'Не удалось обработать текст в уроки'}, status=500)
-            video_urls = create_video_with_synthesia(lessons, max_duration=60)
+            video_urls = create_video_with_colossyan(lessons, max_duration=30)
             if not video_urls:
-                return JsonResponse({'error': 'Не удалось сгенерировать видео через Synthesia'}, status=500)
+                return JsonResponse({'error': 'Не удалось сгенерировать видео через Colossyan'}, status=500)
             zip_path = create_zip_archive(video_urls)
             if not zip_path:
                 return JsonResponse({'error': 'Не удалось создать ZIP архив'}, status=500)
