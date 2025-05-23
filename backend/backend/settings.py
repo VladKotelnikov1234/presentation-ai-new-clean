@@ -25,6 +25,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Добавлено первым
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -39,7 +40,7 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'static'],  # Путь к index.html
+        'DIRS': [BASE_DIR / 'static'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -69,6 +70,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # Добавлено
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -80,12 +82,12 @@ REST_FRAMEWORK = {
     ],
 }
 
-# API-ключи (только из окружения, без значений по умолчанию)
+# API-ключи
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 SYNTHESIA_API_KEY = os.getenv('SYNTHESIA_API_KEY')
 IOINTELLIGENCE_API_KEY = os.getenv('IOINTELLIGENCE_API_KEY')
 
-# Временное отключение проверки API-ключей для деплоя
+# Временное отключение проверки API-ключей
 # if not ELEVENLABS_API_KEY or not SYNTHESIA_API_KEY or not IOINTELLIGENCE_API_KEY:
 #     logger.error("Одна или несколько API-ключи не заданы")
 #     raise ValueError("Отсутствуют необходимые API-ключи")
