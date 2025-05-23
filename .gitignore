@@ -22,3 +22,4 @@ echo "backend/media/logs/" >> .gitignore
 echo "*.log" >> .gitignore
 echo "*.mp4" >> .gitignore
 echo "*.exe" >> .gitignore
+backend/staticfiles/
