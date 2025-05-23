@@ -2,26 +2,19 @@ services:
   - type: web
     name: service-lessons
     env: python
-    runtimeVersion: "3.10"
-    plan: starter
-    region: oregon
-    buildCommand: "/opt/render/project/.venv/bin/python3.10 -m pip install --upgrade pip && /opt/render/project/.venv/bin/python3.10 -m pip install -r requirements.txt && cd backend && /opt/render/project/.venv/bin/python3.10 manage.py collectstatic --noinput && /opt/render/project/.venv/bin/python3.10 manage.py migrate"
-    startCommand: "/opt/render/project/.venv/bin/python3.10 -m gunicorn backend.wsgi:application --bind 0.0.0.0:8000"
+    runtime: python3.10
+    buildCommand: "/opt/render/project/.venv/bin/python3.10 -m pip install --upgrade pip && /opt/render/project/.venv/bin/python3.10 -m pip install -r requirements.txt && cd backend && /opt/render/project/.venv/bin/python3.10 manage.py collectstatic --noinput && ls -R staticfiles && /opt/render/project/.venv/bin/python3.10 manage.py migrate"
+    startCommand: "/opt/render/project/.venv/bin/python3.10 -m gunicorn backend.wsgi:application --bind 0.0.0.0:${PORT}"
     envVars:
       - key: PYTHON_VERSION
-        value: "3.10"
-      - key: IOINTELLIGENCE_API_KEY
-        value: "io-v2-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJvd25eI6IjkzNTZlN2NmLTFmNTctNGE2Yi05NjljLTQzZjI3Njg5MzI3MSIsImV4cCI6NDkwMTU0NTE5OH0.adY0csXaEhKDEc14_Ibgoe91gymgDk3YJrRifWMjoikQGzsbM0c0sGAPcZrrMYpTsXzsZm63U-E53Pssz8z-0Q"
+        value: 3.10.12
+      - key: DJANGO_SETTINGS_MODULE
+        value: backend.settings
+      - key: DEBUG
+        value: False
       - key: ELEVENLABS_API_KEY
         sync: false
       - key: SYNTHESIA_API_KEY
         sync: false
-      - key: DJANGO_SETTINGS_MODULE
-        value: "backend.settings"
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: SECRET_KEY
+      - key: IOINTELLIGENCE_API_KEY
         sync: false
-    autoDeploy: true
-    numInstances: 1
-    healthCheckPath: "/"

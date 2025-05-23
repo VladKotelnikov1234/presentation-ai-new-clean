@@ -25,7 +25,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Добавлено первым
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Первым!
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -70,7 +70,11 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # Добавлено
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Дополнительные настройки WhiteNoise
+WHITENOISE_AUTOREFRESH = False  # Отключаем автообновление в продакшене
+WHITENOISE_USE_FINDERS = True  # Используем Django finders для поиска файлов
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
