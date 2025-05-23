@@ -170,3 +170,8 @@ class UploadView(View):
         except Exception as e:
             logger.error(f"Ошибка обработки: {e}")
             return JsonResponse({'error': str(e)}, status=500)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ListModelsView(View):
+    def get(self, request, *args, **kwargs):
+        return JsonResponse({"message": "This endpoint is not implemented yet"}, status=200)
